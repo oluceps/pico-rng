@@ -6,10 +6,12 @@ import os
 import random
 import time
 import argparse
+import sys
 
 # Parser stuff
 parser = argparse.ArgumentParser(description="Raspberry Pi Pico Random Number Generator Test Tool")
 parser.add_argument("--performance", action="store_true", help="Performance test the RNG.")
+parser.add_argument("--endless", action="store_true", help="Outputs random bytes endlessly.")
 args = parser.parse_args()
 
 # If this is set, then the /dev/pico_rng file exists
@@ -17,7 +19,7 @@ rng_chardev = None
 
 if os.path.exists("/dev/pico_rng"):
     rng_chardev = open("/dev/pico_rng", "rb")
-    
+
 # File does not exist, test with usb.core
 if not rng_chardev:
     # Get the device
@@ -37,15 +39,28 @@ if not rng_chardev:
 count = 0
 start_time = (int(time.time()) - 1)
 
+def get_data():
+    return rng_chardev.read(64) if rng_chardev else endpt.read(64, 500)
+
 if args.performance:
     while True:
         try:
-            from_device = rng_chardev.read(64) if rng_chardev else endpt.read(64, 500)
+            from_device = get_data()
             count = count+1
-            print(from_device, end="")
-            print("\t{0:.2f} KB/s".format((int((count * 64) / (int(time.time()) - start_time))) / 1024 ))
+            #print(from_device, end="")
+            print("\t{0:.2f} KB/s".format((int((count * 64) / (int(time.time()) - start_time))) / 1024 ), end='\r')
         except KeyboardInterrupt:
             exit(0)
+elif args.endless:
+    while True:
+        try:
+            data = get_data()
+            sys.stdout.buffer.write(data)
+        except KeyboardInterrupt:
+            exit(0)
+        except BrokenPipeError:
+            exit(0)
 else:
-    from_device = rng_chardev.read(64) if rng_chardev else endpt.read(64, 500)
+    from_device = get_data()
     print(from_device)
+    sys.stdout.buffer.write(bytearray(from_device))

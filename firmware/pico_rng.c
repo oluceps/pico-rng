@@ -11,6 +11,7 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
+#include "hardware/structs/rosc.h"
 
 // For memcpy
 #include <string.h>
@@ -25,6 +26,12 @@
 #include "hardware/irq.h"
 // For resetting the USB controller
 #include "hardware/resets.h"
+
+#include "pico/time.h"
+static inline uint32_t board_millis(void)
+{
+    return to_ms_since_boot(get_absolute_time());
+}
 
 // Device descriptors
 #include "pico_rng.h"
@@ -552,26 +559,31 @@ void ep0_out_handler(uint8_t *buf, uint16_t len) {
  * @param len the length of the random data in bytes
  */
 void get_random_data(char *buf, uint16_t len) {
-    uint16_t adc_result;
-    uint8_t size;
-    int i;
-
-    gpio_put(25, 1);
-
-    if(len > 64)
-    {
-        //TODO handle length error
-        size = 64;
-    }
-
+    uint64_t word = 0x0;
+    if (len > 64)
+        len = 64;
     memset(buf, 0, len);
-    for(i = 1; i <= len; i=i+1)
-    {
-        adc_result = adc_read();
-        memcpy(&buf[i-1], (void*)&adc_result, 2);
+    /* This algorithm generates 2 words, i.e., 8 bytes. */
+    for (int i = 0; i < len; i += 8) {
+        uint64_t random_word = 0xcbf29ce484222325;
+        for (int round = 0; round < 8; round++)
+        {
+            for (int n = 0; n < 64; n++)
+            {
+                uint8_t bit1, bit2;
+                do
+                {
+                    bit1 = rosc_hw->randombit & 0xff;
+                    // sleep_ms(1);
+                    bit2 = rosc_hw->randombit & 0xff;
+                } while (bit1 == bit2);
+                word = (word << 1) | bit1;
+            }
+            random_word ^= word^board_millis()^adc_read();
+            random_word *= 0x00000100000001B3;
+        }
+        memcpy(buf + i, &random_word, sizeof(random_word));
     }
-
-    gpio_put(25, 0);
 }
 
 /**
@@ -597,14 +609,10 @@ int main(void) {
     // Enable uart debug messages
     stdio_init_all();
 
-    // Builtin GPIO
-    gpio_init(25);
-    gpio_set_dir(25, GPIO_OUT);
-
     // ADC
     adc_init();
-    adc_gpio_init(26);
-    adc_select_input(0);
+    adc_gpio_init(27);
+    adc_select_input(1);
 
     printf("USB pico rng\n");
     usb_device_init();

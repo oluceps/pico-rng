@@ -108,7 +108,7 @@ struct usb_endpoint_configuration *usb_get_endpoint_configuration(uint8_t addr) 
  */
 uint8_t usb_prepare_string_descriptor(const unsigned char *str) {
     // 2 for bLength + bDescriptorType + strlen * 2 because string is unicode. i.e. other byte will be 0
-    uint8_t bLength = 2 + (strlen(str) * 2);
+    uint8_t bLength = 2 + (strlen((const char *)str) * 2);
     static const uint8_t bDescriptorType = 0x03;
 
     volatile uint8_t *buf = &ep0_buf[0];
@@ -259,13 +259,13 @@ void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uin
  * @brief Send device descriptor to host
  *
  */
-void usb_handle_device_descriptor(void) {
+void usb_handle_device_descriptor(volatile struct usb_setup_packet *pkt) {
     const struct usb_device_descriptor *d = dev_config.device_descriptor;
     // EP0 in
     struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP0_IN_ADDR);
     // Always respond with pid 1
     ep->next_pid = 1;
-    usb_start_transfer(ep, (uint8_t *) d, sizeof(struct usb_device_descriptor));
+    usb_start_transfer(ep, (uint8_t *) d, MIN(sizeof(struct usb_device_descriptor),pkt->wLength));
 }
 
 /**
@@ -383,6 +383,7 @@ void usb_handle_setup_packet(void) {
         } else if (req == USB_REQUEST_SET_CONFIGURATION) {
             usb_set_device_configuration(pkt);
         } else {
+            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
             printf("Other OUT request (0x%x)\r\n", pkt->bRequest);
         }
     } else if (req_direction == USB_DIR_IN) {
@@ -391,7 +392,7 @@ void usb_handle_setup_packet(void) {
 
             switch (descriptor_type) {
                 case USB_DT_DEVICE:
-                    usb_handle_device_descriptor();
+                    usb_handle_device_descriptor(pkt);
                     printf("GET DEVICE DESCRIPTOR\r\n");
                     break;
 
@@ -407,9 +408,14 @@ void usb_handle_setup_packet(void) {
 
                 default:
                     printf("Unhandled GET_DESCRIPTOR type 0x%x\r\n", descriptor_type);
-            }
+                    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
+                }
+            } else if (req == USB_REQUEST_GET_STATUS) {
+                uint16_t status = 2;
+                usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), (uint8_t *) &status, MIN(sizeof(uint16_t),pkt->wLength));
         } else {
             printf("Other IN request (0x%x)\r\n", pkt->bRequest);
+            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
         }
     }
 }
@@ -539,7 +545,7 @@ void ep0_out_handler(uint8_t *buf, uint16_t len) {
 }
 
 /**
- * @brief Get random data using the onboard pico ADC that essentially measure 
+ * @brief Get random data using the onboard pico ADC that essentially measure
  *        environmental noise because it is assumed that it is not connected to anything.
  *
  * @param buf the buffer to store the random data in
@@ -578,7 +584,7 @@ void get_random_data(char *buf, uint16_t len) {
 void ep1_in_handler(uint8_t *buf, uint16_t len) {
 
     printf("Sent %d bytes to host\n", len);
-    
+
     // Prime the EP1 IN buffer for the next transfer
     get_random_data(ep1_buf, 64);
     usb_start_transfer(usb_get_endpoint_configuration(EP1_IN_ADDR), ep1_buf, 64);

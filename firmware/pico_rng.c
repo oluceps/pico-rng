@@ -243,7 +243,7 @@ void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uin
     // For multi packet transfers see the tinyusb port.
     assert(len <= 64);
 
-    printf("Start transfer of len %d on ep addr 0x%x\n", len, ep->descriptor->bEndpointAddress);
+    //printf("Start transfer of len %d on ep addr 0x%x\n", len, ep->descriptor->bEndpointAddress);
 
     // Prepare buffer control register value
     uint32_t val = len | USB_BUF_CTRL_AVAIL;
@@ -450,7 +450,7 @@ static void usb_handle_ep_buff_done(struct usb_endpoint_configuration *ep) {
  */
 static void usb_handle_buff_done(uint ep_num, bool in) {
     uint8_t ep_addr = ep_num | (in ? USB_DIR_IN : 0);
-    printf("EP %d (in = %d) done\n", ep_num, in);
+    //printf("EP %d (in = %d) done\n", ep_num, in);
     for (uint i = 0; i < USB_NUM_ENDPOINTS; i++) {
         struct usb_endpoint_configuration *ep = &dev_config.endpoints[i];
         if (ep->descriptor && ep->handler) {
@@ -559,15 +559,16 @@ void ep0_out_handler(uint8_t *buf, uint16_t len) {
  * @param len the length of the random data in bytes
  */
 void get_random_data(char *buf, uint16_t len) {
-    uint64_t word = 0x0;
     if (len > 64)
         len = 64;
     memset(buf, 0, len);
     /* This algorithm generates 2 words, i.e., 8 bytes. */
-    for (int i = 0; i < len; i += 8) {
+    /* We apply Fowler–Noll–Vo hash function as it randomizes the input and is quite fast. */
+    for (int i = 0; i < len; i += sizeof(uint64_t)) {
         uint64_t random_word = 0xcbf29ce484222325;
         for (int round = 0; round < 8; round++)
         {
+            uint64_t word = 0x0;
             for (int n = 0; n < 64; n++)
             {
                 uint8_t bit1, bit2;
@@ -576,7 +577,7 @@ void get_random_data(char *buf, uint16_t len) {
                     bit1 = rosc_hw->randombit & 0xff;
                     // sleep_ms(1);
                     bit2 = rosc_hw->randombit & 0xff;
-                } while (bit1 == bit2);
+                } while (0);
                 word = (word << 1) | bit1;
             }
             random_word ^= word^board_millis()^adc_read();
@@ -595,7 +596,7 @@ void get_random_data(char *buf, uint16_t len) {
  */
 void ep1_in_handler(uint8_t *buf, uint16_t len) {
 
-    printf("Sent %d bytes to host\n", len);
+    //printf("Sent %d bytes to host\n", len);
 
     // Prime the EP1 IN buffer for the next transfer
     get_random_data(ep1_buf, 64);

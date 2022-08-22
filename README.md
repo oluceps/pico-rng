@@ -89,8 +89,9 @@ Fig. 1 depicts the distribution of the bytes, from `0` to `255`. Ideally, it mus
 
 Fig. 2 depicts the distribution of chi square tests and excess percentages. Ideally, the distribution of chi square tests must follow a chi square distribution with mean at `255`. Excess percentage distribution must follow a uniform distribution.
 
-Pico-rng is also tested with `ent`, `rngtest` and `dieharder` tests. These are the results obtained with pico-rng:
+Pico-rng is also tested with `ent`, `rngtest`, `sp800-90b` and `dieharder` tests. These are the results obtained with pico-rng:
 
+### Ent
 ```
 $ ent sample.rng
 Entropy = 7.999999 bits per byte.
@@ -114,6 +115,7 @@ Serial correlation coefficient is 0.000006 (totally uncorrelated = 0.0).
 
 These results show that pico-rng is pretty random.
 
+### FIPS 140-2
 
 ```bash
 $ cat sample.rng | rngtest
@@ -139,6 +141,27 @@ rngtest: Program run time: 34612429 microseconds
 In these results, we have a total number of trials `429496 (429141+355)`.
 - The acceptable result of Monobit test is `1` failed trial for every `9662` trials. For `429496` trials, the number of failed trials should be less than `429496/9662=44.45`.
 - The acceptable result of Poker test is `1` failed trial for every `10078` trials. For `429496` trials, the number of failed trials should be less than `42.62`.
+
+### SP800-90B
+
+SP800-90b is the superseded version of FIPS 140-2 (`rngtest`). Can be obtained from here [https://github.com/usnistgov/SP800-90B_EntropyAssessment](https://github.com/usnistgov/SP800-90B_EntropyAssessment).
+
+```bash
+$ ./ea-iid sample.rng
+Calculating baseline statistics...
+H_original: 7.995587
+H_bitstring: 0.999863
+min(H_original, 8 X H_bitstring): 7.995587
+** Passed chi square tests
+
+** Passed length of longest repeated substring test
+
+** Passed IID permutation tests
+```
+
+### Diehard
+
+It is a set of different tests.
 
 ```bash
 $ dieharder -a -g 201 -k 2 -Y 1 -m 2 -f sample.rng

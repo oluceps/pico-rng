@@ -33,6 +33,22 @@ static inline uint32_t board_millis(void)
     return to_ms_since_boot(get_absolute_time());
 }
 
+enum  {
+    BLINK_NOT_MOUNTED = (250 << 16) | 250,
+    BLINK_MOUNTED     = (250 << 16) | 250,
+    BLINK_SUSPENDED   = (500 << 16) | 1000,
+    BLINK_PROCESSING  = (50 << 16) | 50,
+
+    BLINK_ALWAYS_ON   = UINT32_MAX,
+    BLINK_ALWAYS_OFF  = 0
+};
+
+static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
+
+void led_set_blink(uint32_t mode) {
+    blink_interval_ms = mode;
+}
+
 // Device descriptors
 #include "pico_rng.h"
 
@@ -521,6 +537,40 @@ void isr_usbctrl(void) {
     }
 }
 
+void led_blinking_task() {
+#ifdef PICO_DEFAULT_LED_PIN
+    static uint32_t start_ms = 0;
+    static uint8_t led_state = false;
+    static uint8_t led_color = PICO_DEFAULT_LED_PIN;
+#ifdef PICO_DEFAULT_LED_PIN_INVERTED
+    uint32_t interval = !led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
+#else
+    uint32_t interval = led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
+#endif
+
+
+    // Blink every interval ms
+    if (board_millis() - start_ms < interval)
+        return; // not enough time
+    start_ms += interval;
+
+    gpio_put(led_color, led_state);
+    led_state ^= 1; // toggle
+#endif
+}
+
+void led_off_all() {
+#ifdef PIMORONI_TINY2040
+    gpio_put(TINY2040_LED_R_PIN, 1);
+    gpio_put(TINY2040_LED_G_PIN, 1);
+    gpio_put(TINY2040_LED_B_PIN, 1);
+#else
+#ifdef PICO_DEFAULT_LED_PIN
+    gpio_put(PICO_DEFAULT_LED_PIN, 0);
+#endif
+#endif
+}
+
 /**
  * @brief EP0 in transfer complete. Either finish the SET_ADDRESS process, or receive a zero
  * length status packet from the host.
@@ -559,6 +609,7 @@ void ep0_out_handler(uint8_t *buf, uint16_t len) {
  * @param len the length of the random data in bytes
  */
 void get_random_data(char *buf, uint16_t len) {
+    led_set_blink(BLINK_PROCESSING);
     if (len > 64)
         len = 64;
     memset(buf, 0, len);
@@ -585,6 +636,7 @@ void get_random_data(char *buf, uint16_t len) {
         }
         memcpy(buf + i, &random_word, sizeof(random_word));
     }
+    led_set_blink(BLINK_MOUNTED);
 }
 
 /**
@@ -610,6 +662,22 @@ int main(void) {
     // Enable uart debug messages
     stdio_init_all();
 
+#ifdef PIMORONI_TINY2040
+    gpio_init(TINY2040_LED_R_PIN);
+    gpio_set_dir(TINY2040_LED_R_PIN, GPIO_OUT);
+    gpio_init(TINY2040_LED_G_PIN);
+    gpio_set_dir(TINY2040_LED_G_PIN, GPIO_OUT);
+    gpio_init(TINY2040_LED_B_PIN);
+    gpio_set_dir(TINY2040_LED_B_PIN, GPIO_OUT);
+#else
+#ifdef PICO_DEFAULT_LED_PIN
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+#endif
+#endif
+
+    led_off_all();
+
     // ADC
     adc_init();
     adc_gpio_init(27);
@@ -623,6 +691,8 @@ int main(void) {
         tight_loop_contents();
     }
 
+    led_set_blink(BLINK_MOUNTED);
+
     // Populate the TX buffer
     get_random_data(ep1_buf, 64);
     usb_start_transfer(usb_get_endpoint_configuration(EP1_IN_ADDR), ep1_buf, 64);
@@ -630,6 +700,7 @@ int main(void) {
     // Everything is interrupt driven so just loop here
     while (1) {
         tight_loop_contents();
+        led_blinking_task();
     }
 
     return 0;

@@ -1,6 +1,6 @@
 # Raspberry Pi Pico Random Number Generator
 
-** This fork includes an enhanced RNG to produce a true RNG. **
+**This fork includes an enhanced RNG to transform a Pico onto a true hardware RNG.**
 
 A basic random number generator that generates numbers from enviromental noise with the onboard DAC of the Raspberry Pi Pico. The project uses the Raspberry Pi Pico USB dev_lowlevel as a starting point. The Pico RNG is not meant to be FIPS 140-2 compliant as a stand-alone device by any means. However it does supply the Linux Kernel with random bits that is used with the appropriate entropy to achieve FIPS 140-2 compliant random numbers. Maybe one day the next gen Pico's will include an onboard crypto module.
 

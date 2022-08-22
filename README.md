@@ -81,7 +81,11 @@ $ python3 firmware/pico_rng_analyze.py sample.rng
 ```
 will produce two figures:
 
+![fig1](https://user-images.githubusercontent.com/55573252/185908242-9fac9e7c-bfd2-440b-bd1d-045b571ed010.png)
+
 Fig. 1 depicts the distribution of the bytes, from `0` to `255`. Ideally, it must be a uniform distribution, with mean equal to `127.5`.
+
+![fig2](https://user-images.githubusercontent.com/55573252/185908272-42973878-7c4f-45ec-8492-6878f8a0bfa6.png)
 
 Fig. 2 depicts the distribution of chi square tests and excess percentages. Ideally, the distribution of chi square tests must follow a chi square distribution with mean at `255`. Excess percentage distribution must follow a uniform distribution.
 

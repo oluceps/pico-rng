@@ -13,6 +13,8 @@ parser = argparse.ArgumentParser(description="Raspberry Pi Pico Random Number Ge
 parser.add_argument("--performance", action="store_true", help="Performance test the RNG.")
 parser.add_argument("--endless", action="store_true", help="Outputs random bytes endlessly.")
 parser.add_argument("--size", default="100", help="Number of bytes to output.")
+parser.add_argument("--vid", default="0000", help="VID.")
+parser.add_argument("--pid", default="0004", help="PID.")
 args = parser.parse_args()
 
 # If this is set, then the /dev/pico_rng file exists
@@ -24,7 +26,7 @@ if os.path.exists("/dev/pico_rng"):
 # File does not exist, test with usb.core
 if not rng_chardev:
     # Get the device
-    rng = usb.core.find(idVendor=0x0000, idProduct=0x0004)
+    rng = usb.core.find(idVendor=int(args.vid, base=16), idProduct=int(args.pid, base=16))
     assert rng is not None
 
     # Get the configuration of the device

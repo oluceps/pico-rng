@@ -259,7 +259,7 @@ static int pico_rng_kthread(void *data)
         LOGGER_DEBUG("Adding hardware randomness\n");
 		// I would not exactly call this rng as trusted, so it will not add entropy, only random bits to the pool
 		// A trusted device would call add_hwgenerator_randomness and credit the entropy pool. For now the credit is 0 while still adding random bits.
-		add_hwgenerator_randomness(buffer, bytes_read, 0);
+		add_hwgenerator_randomness(buffer, bytes_read, 0, 0);
 		LOGGER_DEBUG("Randomness added\n");
 	}
 
